@@ -11,34 +11,68 @@ uniform vec3 u_color2;
 
 in vec2 DrawPos;
 
-vec2 mul(vec2 A, vec2 B) {
-    return vec2(A.x * B.x - A.y * B.y, A.x * B.y + A.y * B.x);
+// Возведение комплексного числа в квадрат
+vec2 square(vec2 A) {
+    return vec2(A.x * A.x - A.y * A.y, 2.0 * A.x * A.y);
 }
 
-bool isInsideFractal(vec2 z, vec2 c) {
-    int n = 0;
-    while (length(z) < 2.0 && n < 128) {
-        z = mul(z, z) + c;
-        n++;
-    }
-    return n == 128;
+// Комплексное сопряжение (нужно для Трикона)
+vec2 conj(vec2 A) {
+    return vec2(A.x, -A.y);
 }
 
 void main() {
-    vec2 z = (DrawPos + u_offset) / u_zoom;
-    bool inside = false;
+    vec2 uv = (DrawPos + u_offset) / u_zoom;
+    vec2 z = vec2(0.0);
+    vec2 c = uv;
+    int n = 0;
+    int max_iter = 256; // Увеличили итерации для большей детализации
 
     if (u_frac_type == 0) {
-        vec2 c = vec2(0.5 + 0.2 * sin(u_time / 10.0), 0.5 + sin(u_time) * 0.2);
-        inside = isInsideFractal(z, c);
-    } else {
-        inside = isInsideFractal(z, z);
+        // 0: Анимированное множество Жюлиа
+        c = vec2(0.5 + 0.2 * sin(u_time / 10.0), 0.5 + sin(u_time) * 0.2);
+        z = uv;
+        while (length(z) < 2.0 && n < max_iter) {
+            z = square(z) + c;
+            n++;
+        }
+    } else if (u_frac_type == 1) {
+        // 1: Множество Мандельброта
+        z = vec2(0.0);
+        c = uv;
+        while (length(z) < 2.0 && n < max_iter) {
+            z = square(z) + c;
+            n++;
+        }
+    } else if (u_frac_type == 2) {
+        // 2: Горящий корабль (Burning Ship)
+        z = vec2(0.0);
+        c = uv;
+        while (length(z) < 2.0 && n < max_iter) {
+            z = abs(z); // Берем модуль от каждой компоненты перед возведением в квадрат
+            z = square(z) + c;
+            n++;
+        }
+    } else if (u_frac_type == 3) {
+        // 3: Трикон (Mandelbar)
+        z = vec2(0.0);
+        c = uv;
+        while (length(z) < 2.0 && n < max_iter) {
+            z = square(conj(z)) + c;
+            n++;
+        }
     }
 
-    if (inside) {
-        float t = fract(length(z) * 2.5 + u_time * 0.4);
+    if (n == max_iter) {
+        // Точка внутри фрактала
+        float t = fract(length(uv) * 2.5 + u_time * 0.4);
         o_color = vec4(mix(u_color2, u_color1, t), 1.0);
     } else {
-        o_color = vec4(0.0, 0.0, 0.0, 1.0);
+        // Точка снаружи фрактала (сглаженная раскраска для плавных градиентов)
+        float log_zn = log(length(z)) / 2.0;
+        float nu = log(log_zn / log(2.0)) / log(2.0);
+        float smooth_n = float(n) + 1.0 - nu;
+        float t = fract(smooth_n * 0.05 + u_time * 0.2);
+        o_color = vec4(mix(u_color1, u_color2, t), 1.0);
     }
 }
