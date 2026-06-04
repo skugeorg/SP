@@ -1,0 +1,24 @@
+{
+  "name": "rl",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "build": "node node_modules/rollup/dist/bin/rollup -c",
+    "watch": "CHOKIDAR_USEPOLLING=1 node node_modules/rollup/dist/bin/rollup -c --watch",
+    "server": "http-server ."
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@rollup/plugin-terser": "^0.4.4",
+    "draggable": "^4.2.0",
+    "gl-matrix": "^3.4.4",
+    "tweakpane": "^4.0.5"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^29.0.3",
+    "@rollup/plugin-node-resolve": "^16.0.3",
+    "rollup": "^4.61.1"
+  }
+}
