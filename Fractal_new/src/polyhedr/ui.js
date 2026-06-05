@@ -55,7 +55,7 @@ pane4.addBinding(PARAMS_LIGHT, 'lightY', { min: -10.0, max: 10.0, step: 0.1, lab
 pane4.addBinding(PARAMS_LIGHT, 'lightZ', { min: -10.0, max: 10.0, step: 0.1, label: 'Позиция Z' });
 pane4.addBinding(PARAMS_LIGHT, 'ambient', { min: 0.0, max: 1.0, step: 0.05, label: 'Фоновый свет' });
 
-pane2.element.style.top = '280px';
+pane2.element.style.top = '900px';
 pane3.element.style.top = '500px';
 pane4.element.style.top = '680px';
 

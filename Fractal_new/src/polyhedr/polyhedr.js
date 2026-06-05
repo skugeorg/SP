@@ -17,7 +17,6 @@ function initGL(canvas) {
   gl.viewportWidth = canvas.width;
   gl.viewportHeight = canvas.height;
   gl.enable(gl.DEPTH_TEST);
-  gl.enable(gl.CULL_FACE);
 }
 
 function getShader(shaderStr, type) {
@@ -109,14 +108,11 @@ function rebuildGeometry() {
     colors.push(c2.r / 255, c2.g / 255, c2.b / 255);
     normals.push(n2x, n2y, n2z);
 
-    // Генерация индексов для двух треугольников, образующих сегмент
     if (i < n) {
       let next_idx1 = idx1 + 2;
       let next_idx2 = idx2 + 2;
       
-      // Треугольник 1: низ-тек, верх-тек, низ-след
       indices.push(idx1, idx2, next_idx1);
-      // Треугольник 2: верх-тек, верх-след, низ-след
       indices.push(idx2, next_idx2, next_idx1);
     }
   }
