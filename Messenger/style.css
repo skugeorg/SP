@@ -1,26 +1,24 @@
+* { box-sizing: border-box; }
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background-color: #f0f2f5;
+    margin: 0;
+    height: 100vh;
     display: flex;
     justify-content: center;
     align-items: center;
-    height: 100vh;
-    margin: 0;
 }
 
+/* Модалка авторизации */
 .modal {
     display: flex;
     justify-content: center;
     align-items: center;
     position: fixed;
     z-index: 1000;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
+    inset: 0;
     background-color: rgba(0, 0, 0, 0.5);
 }
-
 .modal-content {
     background-color: white;
     padding: 40px;
@@ -30,29 +28,19 @@ body {
     max-width: 400px;
     width: 90%;
 }
-
 .modal-content h2 { margin: 0 0 10px 0; color: #0088cc; }
 .modal-content p { margin: 0 0 20px 0; color: #666; }
-
-#authUsername {
+#authUsername, #authPassword {
     width: 100%;
     padding: 12px 15px;
     border: 2px solid #ccc;
     border-radius: 8px;
     font-size: 1em;
     outline: none;
-    box-sizing: border-box;
+    margin-bottom: 10px;
 }
-
-#authUsername:focus { border-color: #0088cc; }
-
-.error-message {
-    color: #cc0000;
-    font-size: 0.9em;
-    margin-top: 10px;
-    min-height: 20px;
-}
-
+#authUsername:focus, #authPassword:focus { border-color: #0088cc; }
+.error-message { color: #cc0000; font-size: 0.9em; margin-top: 10px; min-height: 20px; }
 #authButton {
     width: 100%;
     padding: 12px;
@@ -65,103 +53,204 @@ body {
     cursor: pointer;
     margin-top: 15px;
 }
-
 #authButton:hover { background-color: #006699; }
 #authButton:disabled { background-color: #ccc; cursor: not-allowed; }
+.auth-toggle { margin-top: 20px; font-size: 0.9em; color: #666; }
+.auth-toggle a { color: #0088cc; text-decoration: none; font-weight: bold; cursor: pointer; margin-left: 5px; }
+.auth-toggle a:hover { text-decoration: underline; }
 
-.chat-container {
-    width: 600px;
+/* Мессенджер */
+.messenger {
+    width: 95%;
+    max-width: 1100px;
+    height: 90vh;
     background: white;
     border-radius: 12px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
     display: flex;
-    flex-direction: column;
     overflow: hidden;
 }
 
-.chat-header {
-    background-color: #0088cc;
-    color: white;
+/* Боковая панель */
+.sidebar {
+    width: 320px;
+    border-right: 1px solid #e0e0e0;
+    display: flex;
+    flex-direction: column;
+    background: #fafafa;
+}
+.sidebar-header {
     padding: 15px;
-    text-align: center;
-    font-size: 1.2em;
+    border-bottom: 1px solid #e0e0e0;
+    background: white;
+}
+.current-user {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
     font-weight: bold;
+    color: #0088cc;
+}
+#logoutButton {
+    background: none;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 4px 10px;
+    cursor: pointer;
+    color: #666;
+}
+#logoutButton:hover { background: #f0f0f0; }
+#searchInput {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 20px;
+    outline: none;
+    font-size: 0.9em;
+}
+#searchInput:focus { border-color: #0088cc; }
+
+.search-results {
+    max-height: 220px;
+    overflow-y: auto;
+    background: white;
+    border-bottom: 1px solid #e0e0e0;
+}
+.search-item {
+    padding: 10px 15px;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.search-item:hover { background: #f0f8ff; }
+.search-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #0088cc;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    flex-shrink: 0;
 }
 
-.user-info { font-size: 0.7em; font-weight: normal; margin-top: 5px; opacity: 0.9; }
+.chats-list { flex: 1; overflow-y: auto; }
+.chat-item {
+    padding: 12px 15px;
+    border-bottom: 1px solid #f0f0f0;
+    cursor: pointer;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    background: white;
+}
+.chat-item:hover { background: #f5f5f5; }
+.chat-item.active { background: #e3f2fd; }
+.chat-info { flex: 1; min-width: 0; }
+.chat-name { font-weight: bold; color: #333; margin-bottom: 3px; }
+.chat-last {
+    font-size: 0.85em;
+    color: #888;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.chat-time { font-size: 0.75em; color: #aaa; }
+.empty-chats {
+    padding: 30px 15px;
+    text-align: center;
+    color: #999;
+    font-size: 0.9em;
+}
 
+/* Область чата */
+.chat-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: #e5ddd5;
+}
+.chat-placeholder {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: #888;
+    font-size: 1.1em;
+    gap: 15px;
+}
+.placeholder-icon { font-size: 4em; opacity: 0.5; }
+.chat-active { flex: 1; display: flex; flex-direction: column; }
+.chat-header {
+    background: white;
+    padding: 15px 20px;
+    border-bottom: 1px solid #e0e0e0;
+    font-weight: bold;
+    font-size: 1.1em;
+    color: #0088cc;
+}
 .messages-area {
     flex: 1;
     padding: 15px;
     overflow-y: auto;
-    max-height: 500px;
-    background-color: #e5ddd5;
     display: flex;
     flex-direction: column;
 }
-
 .message {
     background-color: #dcf8c6;
-    padding: 10px 15px;
+    padding: 8px 12px;
     border-radius: 12px;
-    margin-bottom: 10px;
-    max-width: 80%;
-    align-self: flex-end;
+    margin-bottom: 8px;
+    max-width: 70%;
     word-wrap: break-word;
+    align-self: flex-end;
 }
-
-.message.incoming { background-color: #ffffff; align-self: flex-start; }
-
-.message.system {
-    background-color: #fff3cd;
-    align-self: center;
-    font-size: 0.85em;
-    color: #856404;
-    max-width: 90%;
-    text-align: center;
-}
-
-.message-username { font-weight: bold; color: #0088cc; margin-bottom: 3px; font-size: 0.9em; }
-.message-time { font-size: 0.7em; color: #999; margin-top: 5px; text-align: right; }
-.message-image { max-width: 100%; border-radius: 8px; margin-top: 5px; cursor: pointer; }
+.message.incoming { background-color: white; align-self: flex-start; }
+.message-username { font-weight: bold; color: #0088cc; font-size: 0.85em; margin-bottom: 2px; }
+.message-time { font-size: 0.7em; color: #999; margin-top: 3px; text-align: right; }
+.message-image { max-width: 100%; border-radius: 8px; margin-top: 5px; cursor: pointer; display: block; }
 
 .input-area {
     display: flex;
-    padding: 15px;
-    background-color: #f0f0f0;
-    border-top: 1px solid #ddd;
-    gap: 10px;
+    padding: 12px;
+    background: white;
+    border-top: 1px solid #e0e0e0;
+    gap: 8px;
     align-items: center;
 }
-
 #attachButton {
-    padding: 10px 15px;
-    background-color: #0088cc;
+    padding: 8px 12px;
+    background: #0088cc;
     color: white;
     border: none;
-    border-radius: 20px;
+    border-radius: 50%;
     cursor: pointer;
-    font-size: 1.2em;
+    font-size: 1.1em;
+    width: 40px;
+    height: 40px;
 }
-
 #messageInput {
     flex: 1;
     padding: 10px 15px;
-    border: 1px solid #ccc;
+    border: 1px solid #ddd;
     border-radius: 20px;
     outline: none;
     font-size: 1em;
 }
-
+#messageInput:focus { border-color: #0088cc; }
 #sendButton {
     padding: 10px 20px;
-    background-color: #0088cc;
+    background: #0088cc;
     color: white;
     border: none;
     border-radius: 20px;
     cursor: pointer;
-    font-size: 1em;
     font-weight: bold;
 }
-
-#sendButton:hover { background-color: #006699; }
+#sendButton:hover { background: #006699; }

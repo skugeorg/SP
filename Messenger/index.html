@@ -5,30 +5,57 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ZOV-messenger</title>
     <link rel="stylesheet" href="style.css">
-    <link rel="icon" type="image/png" href="images/images.png">
 </head>
 <body>
-    <div id="authModal" class="modal">
+    <!-- Модалка авторизации -->
+    <div class="modal" id="authModal">
         <div class="modal-content">
-            <h2>Вход в ZOV-messenger</h2>
-            <p>Введите ваше имя</p>
-            <input type="text" id="authUsername" placeholder="Ваше имя" maxlength="20" autocomplete="off">
-            <div id="authError" class="error-message"></div>
+            <h2 id="authTitle">Вход в ZOV-messenger</h2>
+            <p id="authSubtitle">Введите ваше имя и пароль</p>
+            <input type="text" id="authUsername" placeholder="Имя пользователя" autocomplete="off">
+            <input type="password" id="authPassword" placeholder="Пароль">
+            <div class="error-message" id="authError"></div>
             <button id="authButton">Войти</button>
+            <div class="auth-toggle">
+                <span id="toggleText">Нет аккаунта?</span>
+                <a href="#" id="toggleAuthMode">Зарегистрироваться</a>
+            </div>
         </div>
     </div>
 
-    <div class="chat-container" id="chatContainer" style="display: none;">
-        <div class="chat-header">
-            ZOV-messenger
-            <div class="user-info">Онлайн: <span id="userCount">0</span></div>
+    <!-- Основной интерфейс мессенджера -->
+    <div class="messenger" id="messenger" style="display: none;">
+        <!-- Левая панель -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <div class="current-user">
+                    <span id="currentUserName"></span>
+                    <button id="logoutButton" title="Выход">⎋</button>
+                </div>
+                <input type="text" id="searchInput" placeholder="🔍 Поиск пользователей..." autocomplete="off">
+            </div>
+            <div class="search-results" id="searchResults" style="display: none;"></div>
+            <div class="chats-list" id="chatsList"></div>
         </div>
-        <div class="messages-area" id="messagesArea"></div>
-        <div class="input-area">
-            <input type="file" id="fileInput" accept="image/*" style="display: none;">
-            <button id="attachButton" title="Прикрепить фото">📎</button>
-            <input type="text" id="messageInput" placeholder="Введите сообщение..." autocomplete="on">
-            <button id="sendButton">Отправить</button>
+
+        <!-- Правая панель: активный чат -->
+        <div class="chat-area">
+            <div class="chat-placeholder" id="chatPlaceholder">
+                <div class="placeholder-icon">💬</div>
+                <div>Выберите чат или найдите пользователя</div>
+            </div>
+            <div class="chat-active" id="chatActive" style="display: none;">
+                <div class="chat-header">
+                    <span id="chatPartnerName"></span>
+                </div>
+                <div class="messages-area" id="messagesArea"></div>
+                <div class="input-area">
+                    <input type="file" id="fileInput" accept="image/*" style="display: none;">
+                    <button id="attachButton">📎</button>
+                    <input type="text" id="messageInput" placeholder="Введите сообщение...">
+                    <button id="sendButton">Отправить</button>
+                </div>
+            </div>
         </div>
     </div>
 
