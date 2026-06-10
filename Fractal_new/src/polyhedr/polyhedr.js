@@ -5,7 +5,7 @@ let gl;
 let startTime;
 let VBuf, ColBuf, IBuf, NBuf;
 let u_model_location, u_view_location, u_proj_location;
-let u_light_pos_location, u_ambient_strength_location;
+let u_light_pos_location, u_ambient_strength_location, u_is_light_location;
 let numOfIndices = 0;
 
 function initGL(canvas) {
@@ -47,6 +47,7 @@ function initShaders(vsText, fsText) {
   u_proj_location = gl.getUniformLocation(program, "u_projection");
   u_light_pos_location = gl.getUniformLocation(program, "u_light_pos");
   u_ambient_strength_location = gl.getUniformLocation(program, "u_ambient_strength");
+  u_is_light_location = gl.getUniformLocation(program, "u_is_light");
 }
 
 function rebuildGeometry() {
@@ -148,7 +149,7 @@ function rebuildGeometry() {
 }
 
 function drawScene() {
-  gl.clearColor(0.05, 0.05, 0.05, 1); // Слегка серый фон, чтобы фигура выделялась
+  gl.clearColor(0.0, 0.0, 0.0, 1);
   gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   
@@ -161,7 +162,7 @@ function drawScene() {
 
   const modelMatr = mat4.create();
   if (PARAMS1.autoRotate) {
-    PARAMS1.rotY += 0.01;
+    PARAMS1.rotX += 0.01;
     pane1.refresh();
   }
   mat4.rotateX(modelMatr, modelMatr, PARAMS1.rotX);
@@ -173,8 +174,8 @@ function drawScene() {
   
   gl.uniform3f(u_light_pos_location, PARAMS_LIGHT.lightX, PARAMS_LIGHT.lightY, PARAMS_LIGHT.lightZ);
   gl.uniform1f(u_ambient_strength_location, PARAMS_LIGHT.ambient);
+  gl.uniform1i(u_is_light_location, PARAMS_LIGHT.isLight ? 1 : 0);
 
-  // <-- ГЛАВНОЕ ИЗМЕНЕНИЕ: Рисуем треугольники вместо линий
   gl.drawElements(gl.TRIANGLES, numOfIndices, gl.UNSIGNED_SHORT, 0);
 
   window.requestAnimationFrame(drawScene);
