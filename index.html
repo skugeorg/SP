@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Танцующие фото - Подарок</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #050b1a; }
+    </style>
+</head>
+<body>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.128.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.128.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+        // ============================================================
+        // 1️⃣ ТВОИ РЕСУРСЫ (папка /resources)
+        // ============================================================
+        const imageUrls = [
+            "resources/V1.jpg",
+            "resources/V2.jpg",
+            "resources/V3.jpg",
+            "resources/V4.jpg",
+            "resources/V5.jpg",
+            "resources/V6.jpg",
+            "resources/V7.jpg",
+            "resources/V8.jpg",
+            "resources/V9.jpg",
+            "resources/V10.jpg",
+            "resources/V11.jpg",
+            "resources/V12.jpg"
+        ];
+        const audioUrl = "resources/music.mp3";
+        const cakeModelPath = "resources/cake.glb";
+        
+        // 🖼️ СВОЯ КАРТИНКА ДЛЯ БИЛЛБОРДА (положи в папку resources)
+        const billboardImageUrl = "resources/V_Billboard.png";   // <--- ЗАМЕНИ НА СВОЙ ФАЙЛ
+
+        // ============================================================
+        // 2️⃣ ГЕНЕРАЦИЯ 30 ОБЪЕКТОВ
+        // ============================================================
+        const objectsCount = 30;
+        const sceneObjects = [];
+        for (let i = 0; i < objectsCount; i++) {
+            const t = i / objectsCount;
+            const radius = 2.5 + t * 4.5;
+            const angle = i * 0.85;
+            const x = Math.cos(angle) * radius;
+            const z = Math.sin(angle) * radius;
+            const type = (i % 3 === 0) ? 'sphere' : 'box';
+            const texIdx = i % imageUrls.length;
+            sceneObjects.push({
+                type, pos: [x, 0, z],
+                scale: 0.85 + Math.random() * 0.4,
+                texIdx,
+                jumpAmp: 0.9 + Math.random() * 0.6,
+                rotSpeedY: 0.012 + Math.random() * 0.02,
+                nodAmp: 0.25 + Math.random() * 0.25,
+                phaseShift: i * 0.5
+            });
+        }
+
+        // ============================================================
+        // 3️⃣ СЦЕНА, КАМЕРА, ОСВЕЩЕНИЕ
+        // ============================================================
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x050b1a);
+        scene.fog = new THREE.FogExp2(0x050b1a, 0.004);
+
+        const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(7, 5, 10);
+        camera.lookAt(0, 1.5, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.06;
+        controls.rotateSpeed = 1.2;
+        controls.zoomSpeed = 1.2;
+        controls.enableZoom = true;
+        controls.enablePan = true;
+        controls.target.set(0, 1.2, 0);
+
+        // Освещение
+        const ambientLight = new THREE.AmbientLight(0x404060);
+        scene.add(ambientLight);
+        const mainLight = new THREE.DirectionalLight(0xfff5e0, 1.2);
+        mainLight.position.set(4, 8, 3);
+        mainLight.castShadow = true;
+        mainLight.shadow.mapSize.width = 1024;
+        mainLight.shadow.mapSize.height = 1024;
+        scene.add(mainLight);
+        const fillLight = new THREE.PointLight(0x88aaff, 0.5);
+        fillLight.position.set(-2, 3, 4);
+        scene.add(fillLight);
+        const backLight = new THREE.PointLight(0xffaa66, 0.4);
+        backLight.position.set(0, 2, -5);
+        scene.add(backLight);
+        const groundLight = new THREE.PointLight(0x77aaff, 0.3);
+        groundLight.position.set(0, -1, 0);
+        scene.add(groundLight);
+
+        // Пол (сетка) и плоскость для теней
+        const gridHelper = new THREE.GridHelper(24, 30, 0x88aaff, 0x335588);
+        gridHelper.position.y = -0.05;
+        gridHelper.material.transparent = true;
+        gridHelper.material.opacity = 0.35;
+        scene.add(gridHelper);
+        const shadowPlane = new THREE.Mesh(
+            new THREE.PlaneGeometry(20, 20),
+            new THREE.ShadowMaterial({ opacity: 0.4, color: 0x000000, transparent: true, side: THREE.DoubleSide })
+        );
+        shadowPlane.rotation.x = -Math.PI / 2;
+        shadowPlane.position.y = -0.04;
+        shadowPlane.receiveShadow = true;
+        scene.add(shadowPlane);
+
+        // Звёзды
+        const starGeometry = new THREE.BufferGeometry();
+        const starCount = 2000;
+        const starPositions = new Float32Array(starCount * 3);
+        for (let i = 0; i < starCount; i++) {
+            starPositions[i*3] = (Math.random() - 0.5) * 300;
+            starPositions[i*3+1] = (Math.random() - 0.5) * 80 + 10;
+            starPositions[i*3+2] = (Math.random() - 0.5) * 150 - 70;
+        }
+        starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+        const stars = new THREE.Points(starGeometry, new THREE.PointsMaterial({ color: 0xaaccff, size: 0.12, transparent: true, opacity: 0.7 }));
+        scene.add(stars);
+
+        // ============================================================
+        // 4️⃣ ВСПОМОГАТЕЛЬНЫЕ ПЕРЕМЕННЫЕ
+        // ============================================================
+        let meshes = [];
+        let loadedTextures = [];
+        let audioContext = null, audioElement = null, analyserNode = null;
+        let isMusicPlaying = false;
+        let bassIntensity = 0.4;
+        let cakeModel = null;
+        let billboard = null;
+
+        // ============================================================
+        // 5️⃣ ЗАГРУЗКА ТЕКСТУРЫ ДЛЯ БИЛЛБОРДА (из твоей картинки)
+        // ============================================================
+        function loadBillboardTexture(callback) {
+            new THREE.TextureLoader().load(billboardImageUrl,
+                (texture) => {
+                    console.log("✅ Текстура биллборда загружена:", billboardImageUrl);
+                    callback(texture);
+                },
+                undefined,
+                (err) => {
+                    console.error("❌ Не удалось загрузить картинку для биллборда, будет стандартный текст", err);
+                    // Запасной вариант: создаём canvas с текстом
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = 512;
+                    canvas.height = 256;
+                    const grad = ctx.createLinearGradient(0, 0, canvas.width, 0);
+                    grad.addColorStop(0, '#ff9a9e');
+                    grad.addColorStop(1, '#fad0c4');
+                    ctx.fillStyle = grad;
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 12;
+                    ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
+                    ctx.fillStyle = '#2c3e50';
+                    ctx.font = 'Bold 42px "Segoe UI", "Arial"';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('🎉 ПОЗДРАВЛЯЮ! 🎉', canvas.width/2, 85);
+                    ctx.font = '32px "Segoe UI", "Arial"';
+                    ctx.fillStyle = '#e74c3c';
+                    ctx.fillText('С ДНЁМ РОЖДЕНИЯ!', canvas.width/2, 150);
+                    ctx.font = '22px "Segoe UI", "Arial"';
+                    ctx.fillStyle = '#2c3e50';
+                    ctx.fillText('Пусть всё исполнится!', canvas.width/2, 215);
+                    const fallbackTexture = new THREE.CanvasTexture(canvas);
+                    callback(fallbackTexture);
+                }
+            );
+        }
+
+        function addBillboard(texture) {
+            const material = new THREE.MeshStandardMaterial({ map: texture, side: THREE.DoubleSide });
+            const geometry = new THREE.PlaneGeometry(5, 3);
+            billboard = new THREE.Mesh(geometry, material);
+            billboard.position.set(0, 7, 0);
+            billboard.castShadow = true;
+            scene.add(billboard);
+            console.log("📢 Биллборд добавлен");
+        }
+
+        // ============================================================
+        // 6️⃣ ЗАГРУЗКА ТЕКСТУР ФОТО, МОДЕЛИ ТОРТА И ОБЪЕКТОВ
+        // ============================================================
+        function loadAllTextures(callback) {
+            if (!imageUrls.length) { callback([]); return; }
+            let loaded = 0;
+            const textures = [];
+            imageUrls.forEach((url, idx) => {
+                const texture = new THREE.TextureLoader().load(url,
+                    () => { loaded++; textures.push(texture); if (loaded === imageUrls.length) callback(textures); },
+                    undefined,
+                    (err) => { console.error(`Ошибка ${url}`, err); loaded++; if (loaded === imageUrls.length) callback(textures); }
+                );
+            });
+        }
+
+        function loadCakeModel() {
+            const loader = new GLTFLoader();
+            loader.load(cakeModelPath,
+                (gltf) => {
+                    cakeModel = gltf.scene;
+                    cakeModel.position.set(0, 0, 0);
+                    cakeModel.scale.set(0.02, 0.02, 0.02);
+                    cakeModel.traverse(node => { if (node.isMesh) node.castShadow = true; });
+                    scene.add(cakeModel);
+                    console.log("🎂 Торт загружен");
+                },
+                undefined,
+                (error) => console.error("Ошибка загрузки торта:", error)
+            );
+        }
+
+        function buildScene(textureList) {
+            sceneObjects.forEach((obj, i) => {
+                let geometry = obj.type === 'sphere' ? new THREE.SphereGeometry(0.6, 48, 48) : new THREE.BoxGeometry(1.1, 1.1, 1.1);
+                let material;
+                if (textureList.length > 0 && obj.texIdx < textureList.length) {
+                    material = new THREE.MeshStandardMaterial({ map: textureList[obj.texIdx], roughness: 0.3, metalness: 0.05 });
+                } else {
+                    material = new THREE.MeshStandardMaterial({ color: new THREE.Color().setHSL(i * 0.1, 0.8, 0.6) });
+                }
+                const mesh = new THREE.Mesh(geometry, material);
+                mesh.position.set(obj.pos[0], obj.pos[1], obj.pos[2]);
+                mesh.scale.set(obj.scale, obj.scale, obj.scale);
+                mesh.castShadow = true;
+                mesh.userData = {
+                    physics: {
+                        y: obj.pos[1], vy: 0,
+                        gravity: 18.0, bounceDamping: 0.65, groundY: 0.0,
+                        jumpAmp: obj.jumpAmp * 0.6,
+                        phaseShift: obj.phaseShift,
+                        rotY: 0, rotX: 0, rotZ: 0,
+                        rotSpeedY: obj.rotSpeedY,
+                        nodAmp: obj.nodAmp,
+                        baseScale: obj.scale
+                    }
+                };
+                scene.add(mesh);
+                meshes.push(mesh);
+            });
+            console.log(`Создано объектов: ${meshes.length}`);
+        }
+
+        // ============================================================
+        // 7️⃣ АУДИО И АНАЛИЗ БАСА
+        // ============================================================
+        async function initAudio() {
+            if (audioContext) await audioContext.close();
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            analyserNode = audioContext.createAnalyser();
+            analyserNode.fftSize = 256;
+            audioElement = new Audio();
+            audioElement.crossOrigin = "anonymous";
+            audioElement.src = audioUrl;
+            audioElement.loop = true;
+            const sourceNode = audioContext.createMediaElementSource(audioElement);
+            sourceNode.connect(analyserNode);
+            analyserNode.connect(audioContext.destination);
+        }
+
+        async function startMusic() {
+            if (isMusicPlaying) return;
+            if (!audioContext) await initAudio();
+            if (audioContext.state === 'suspended') await audioContext.resume();
+            try {
+                await audioElement.play();
+                isMusicPlaying = true;
+                console.log("🎵 Музыка играет");
+            } catch(e) {
+                console.warn("Автовоспроизведение заблокировано, нажми ещё раз", e);
+            }
+        }
+
+        // ============================================================
+        // 8️⃣ АНИМАЦИЯ
+        // ============================================================
+        let lastTime = performance.now() / 1000;
+        function animate() {
+            const now = performance.now() / 1000;
+            let dt = Math.min(0.033, now - lastTime);
+            if (dt <= 0) dt = 0.016;
+            lastTime = now;
+
+            if (isMusicPlaying && analyserNode && audioElement && !audioElement.paused) {
+                const dataArray = new Uint8Array(analyserNode.frequencyBinCount);
+                analyserNode.getByteFrequencyData(dataArray);
+                let sum = 0;
+                const lowCount = Math.min(20, dataArray.length);
+                for (let i = 0; i < lowCount; i++) sum += dataArray[i];
+                let intensity = (sum / lowCount - 20) / 180;
+                bassIntensity = Math.min(1.0, Math.max(0.2, intensity));
+            } else {
+                bassIntensity = 0.3 + Math.sin(Date.now() * 0.005) * 0.15;
+            }
+
+            meshes.forEach(mesh => {
+                const phys = mesh.userData.physics;
+                if (!phys) return;
+                phys.vy -= phys.gravity * dt;
+                phys.y += phys.vy * dt;
+                if (phys.y <= phys.groundY) {
+                    phys.y = phys.groundY;
+                    let bounceForce = 4.5 + bassIntensity * 3.5;
+                    bounceForce *= phys.jumpAmp;
+                    phys.vy = bounceForce;
+                    phys.vy += (Math.random() - 0.5) * 0.8;
+                }
+                mesh.position.y = phys.y;
+                phys.rotY += phys.rotSpeedY * (0.8 + bassIntensity * 0.6);
+                mesh.rotation.y = phys.rotY;
+                const time = now;
+                const nodFactor = 0.5 + bassIntensity;
+                phys.rotX = Math.sin(time * 5.5 + phys.phaseShift) * phys.nodAmp * nodFactor;
+                phys.rotZ = Math.sin(time * 4.2 + phys.phaseShift * 1.3) * phys.nodAmp * 0.5 * nodFactor;
+                mesh.rotation.x = phys.rotX;
+                mesh.rotation.z = phys.rotZ;
+                const scalePulse = 1 + Math.max(0, Math.min(0.15, Math.abs(phys.vy) * 0.03));
+                const s = phys.baseScale * scalePulse;
+                mesh.scale.set(s, s, s);
+            });
+
+            if (billboard) {
+                const dx = camera.position.x - billboard.position.x;
+                const dz = camera.position.z - billboard.position.z;
+                const angle = Math.atan2(dx, dz);
+                billboard.rotation.y = angle;
+            }
+
+            stars.rotation.y += 0.0008;
+            stars.rotation.x += 0.0004;
+            controls.update();
+            renderer.render(scene, camera);
+            requestAnimationFrame(animate);
+        }
+
+        // ============================================================
+        // 9️⃣ ЗАПУСК
+        // ============================================================
+        loadAllTextures((textures) => {
+            buildScene(textures);
+            lastTime = performance.now() / 1000;
+            animate();
+        });
+        loadCakeModel();
+
+        // Загружаем текстуру для биллборда и после загрузки добавляем его
+        loadBillboardTexture((texture) => {
+            addBillboard(texture);
+        });
+
+        initAudio().catch(e => console.warn(e));
+        function onFirstTouch() {
+            startMusic();
+            window.removeEventListener('click', onFirstTouch);
+            window.removeEventListener('touchstart', onFirstTouch);
+        }
+        window.addEventListener('click', onFirstTouch);
+        window.addEventListener('touchstart', onFirstTouch);
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        console.log("Сцена готова, нажми на экран для музыки");
+    </script>
+</body>
+</html>
