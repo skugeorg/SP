@@ -1,0 +1,675 @@
+Message crackers
+
+Прикид реализации:
+
+class win
+{
+protected:
+  HWND hWnd;           // window handle
+  INT W, H;            // window size
+  HINSTANCE hInstance; // application handle
+private:
+  static LRESULT CALLBACK WinFunc( HWND hWnd, UINT Msg,
+                                   WPARAM wParam, LPARAM lParam );
+
+  BOOL IsFullScreen;
+  RECT FullScreenSaveRect;
+  INT MouseWheel;
+
+public:
+  BOOL IsActive;
+
+  win( HINSTANCE hInst = GetModuleHandle(nullptr) );
+  virtual ~win( VOID );
+
+  virtual VOID Run( VOID );
+  VOID FlipFullScreen( VOID );
+
+private:
+  // message cracks
+  VOID OnGetMinMaxInfo( MINMAXINFO *MinMax ); // ???
+  virtual BOOL OnCreate( CREATESTRUCT *CS );
+  virtual VOID OnDestroy( VOID );
+  virtual BOOL OnEraseBkgnd( HDC hDC );
+  virtual VOID OnPaint( HDC hDC, PAINTSTRUCT *Ps );
+  virtual VOID OnActivate( UINT Reason, HWND hWndActDeact, BOOL IsMinimized );
+  virtual VOID OnMouseWheel( INT X, INT Y, INT Z, UINT Keys );
+  virtual VOID OnButtonDown( BOOL IsDoubleClick, INT X, INT Y, UINT Keys );
+  virtual VOID OnButtonUp( INT X, INT Y, UINT Keys );
+  virtual VOID OnMouseMove( INT X, INT Y, UINT Keys );
+  virtual VOID OnSize( UINT State, INT W, INT H );
+  virtual VOID OnTimer( INT Id );
+  virtual VOID OnDropFiles( HDROP hDrop );
+  virtual VOID OnDrawItem( INT Id, DRAWITEMSTRUCT *DrawItem );
+  virtual LRESULT OnNotify( INT Id, NMHDR *NoteHead );
+  virtual VOID OnCommand( INT Id, HWND hWndCtl, UINT CodeNotify );
+  virtual VOID OnMenuSelect( HMENU hMenu, INT Item, HMENU hMenuPopup, UINT Flags );
+  virtual VOID OnInitMenuPopup( HMENU hMenu, UINT Item, BOOL IsSystemMenu );
+  virtual VOID OnHScroll( HWND hWndCtl, UINT Code, INT Pos );
+  virtual VOID OnVScroll( HWND hWndCtl, UINT Code, INT Pos );
+  virtual VOID OnExitSizeMove( VOID );
+  virtual VOID OnEnterSizeMove( VOID );
+  virtual LRESULT OnMessage( UINT Msg, WPARAM wParam, LPARAM lParam );
+}
+
+
+hWnd = CreateWindow(...)
+win MyW;
+MyW.hWnd = hWnd;
+
+!!! Как соотнести окно в Windows с классом win?
+
+А так:
+за окном закрепим указатель на класс окна, который описан выше:
+
+в конструкторе:
+win::win( HINSTANCE hInst ) : hInstance(hInst)
+{
+  . . .
+  wc.cbWndExtra = sizeof(win *);
+  . . .
+  // Желательно перпенести в функцию Create
+  hWnd = CreateWindow("My WindowClass", "3D animation",
+    WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+    CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
+    NULL, NULL, hInstance, reinterpret_cast<VOID *>(this));
+  . . .
+}
+
+. . .
+/* Window message handle function (CALLBACK version).
+ *   - window handle:
+ *       HWND hWnd;
+ *   - message identifier (see WM_***):
+ *       UINT Msg;
+ *   - message first parameter ('word' param):
+ *       WPARAM wParam;
+ *   - message second parameter ('long' param):
+ *       LPARAM lParam;
+ * RETURNS:
+ *   (LRESULT) message return code (depended to Msg type).
+ */
+LRESULT CALLBACK win::WinFunc( HWND hWnd, UINT Msg,
+                               WPARAM wParam, LPARAM lParam )
+{
+  switch (Msg)
+  {
+  case WM_GETMINMAXINFO:
+    ((MINMAXINFO *)lParam)->ptMaxTrackSize.y =
+      GetSystemMetrics(SM_CYMAXTRACK) +
+      GetSystemMetrics(SM_CYCAPTION) +
+      GetSystemMetrics(SM_CYMENU) +
+      GetSystemMetrics(SM_CYBORDER) * 2;
+    ((MINMAXINFO *)lParam)->ptMinTrackSize.y =
+      GetSystemMetrics(SM_CYCAPTION) * 8 +
+      GetSystemMetrics(SM_CYMENU) +
+      GetSystemMetrics(SM_CYBORDER) * 2;
+    ((MINMAXINFO *)lParam)->ptMinTrackSize.x += 300;
+    return 0;
+  case WM_CREATE:
+    /* Attach 'this' pointer to window class to window */
+    SetWindowLongPtr(hWnd, 0, (UINT_PTR)((CREATESTRUCT *)lParam)->lpCreateParams);
+  default:
+    Win = reinterpret_cast<win *>(GetWindowLongPtr(hWnd, 0));
+    if (Win != nullptr)
+      switch (Msg)
+      {
+      case WM_CREATE:
+        Win->hWnd = hWnd;
+        return Win->OnCreate((CREATESTRUCT *)lParam) ? 0 : -1;
+      case WM_SIZE:
+        Win->W = (INT)(SHORT)LOWORD(lParam);
+        Win->H = (INT)(SHORT)HIWORD(lParam);
+        Win->OnSize(wParam, LOWORD(lParam), HIWORD(lParam));
+        return 0;
+      case WM_ACTIVATE:
+        Win->IsActive = LOWORD(wParam) != WA_INACTIVE;
+        Win->OnActivate((UINT)LOWORD(wParam), (HWND)(lParam),
+                        (BOOL)HIWORD(wParam));
+        return 0;
+      case WM_ERASEBKGND:
+        return (LRESULT)Win->OnEraseBackground((HDC)wParam);
+      case WM_PAINT:
+        hDC = BeginPaint(hWnd, &ps);
+        Win->OnPaint(hDC, &ps);
+        EndPaint(hWnd, &ps);
+        return 0;
+      case WM_DRAWITEM:
+        Win->OnDrawItem((INT)wParam, (DRAWITEMSTRUCT *)lParam);
+        return 0;
+      case WM_TIMER:
+        Win->OnTimer((UINT)wParam);
+        return 0;
+      case WM_MOUSEWHEEL:
+        Win->OnMouseWheel((INT)(SHORT)LOWORD(lParam),
+                          (INT)(SHORT)HIWORD(lParam),
+                          (INT)(SHORT)HIWORD(wParam),
+                          (UINT)(SHORT)LOWORD(wParam));
+        return 0;
+      case WM_LBUTTONDBLCLK:
+        Win->OnButtonDown(TRUE, (INT)(SHORT)LOWORD(lParam),
+                          (INT)(SHORT)HIWORD(lParam),
+                          (UINT)(SHORT)LOWORD(wParam));
+        return 0;
+      case WM_LBUTTONDOWN:
+      case WM_RBUTTONDOWN:
+      case WM_MBUTTONDOWN:
+        Win->OnLButtonDown(FALSE, (INT)(SHORT)LOWORD(lParam),
+                           (INT)(SHORT)HIWORD(lParam),
+                           (UINT)(SHORT)LOWORD(wParam));
+        return 0;
+      case WM_LBUTTONUP:
+      case WM_RBUTTONUP:
+      case WM_MBUTTONUP:
+        Win->OnLButtonUp((INT)(SHORT)LOWORD(lParam), (INT)(SHORT)HIWORD(lParam), 
+                         (UINT)(SHORT)LOWORD(wParam));
+        return 0;
+      case WM_DROPFILES:
+        Win->OnDropFiles((HDROP)wParam);
+        return 0;
+      case WM_NOTIFY:
+        return Win->OnNotify((INT)wParam, (NMHDR *)lParam);
+      case WM_COMMAND:
+        Win->OnCommand((INT)LOWORD(wParam), (HWND)lParam, (UINT)HIWORD(wParam));
+        return 0;
+      case WM_MENUSELECT:
+        Win->OnMenuSelect((HMENU)lParam,
+          (HIWORD(wParam) & MF_POPUP) ? 0L : (INT)LOWORD(wParam),
+     (HIWORD(wParam) & MF_POPUP) ? GetSubMenu((HMENU)lParam, LOWORD(wParam)) : 0L,
+          (UINT)(((SHORT)HIWORD(wParam) == -1) ? 0xFFFFFFFF : HIWORD(wParam)));
+        return 0;
+      case WM_INITMENUPOPUP:
+        Win->OnInitMenuPopup((HMENU)wParam, (UINT)
+          LOWORD(lParam), (BOOL)HIWORD(lParam));
+        return 0;
+      case WM_HSCROLL:
+        Win->OnHScroll((HWND)lParam, LOWORD(wParam), HIWORD(wParam));
+        return 0;
+      case WM_VSCROLL:
+        Win->OnVScroll((HWND)lParam, LOWORD(wParam), HIWORD(wParam));
+        return 0;
+      case WM_ENTERSIZEMOVE:
+        Win->OnEnterSizeMove();
+        return 0;
+      case WM_EXITSIZEMOVE:
+        Win->OnExitSizeMove();
+        return 0;
+      case WM_DESTROY:
+        Win->OnDestroy();
+        PostQuitMessage(30); // ???
+        return 0;
+      default:
+        return Win->OnMessage(Msg, wParam, lParam);
+     }
+  }
+  return DefWindowProc(hWnd, Msg, wParam, lParam);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+. . .
+VOID win::Run( VOID )
+{
+годится для realtime приложений
+  while (TRUE)
+  {
+    /* Check message at window message queue */
+    if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+      if (msg.message == WM_QUIT)
+        break;
+      else
+      {
+        /* Displatch message to window */
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+      }
+    else
+    {
+      /* Idle... */
+    }
+или обычный вариант с отдачей управления, когда нет сообщений
+  while (GetMessage(&msg, NULL, 0, 0))
+  {
+    /* Displatch message to window */
+    TranslateMessage(&msg);
+    DispatchMessage(&msg);
+  }
+}
+
+примеры кракеров:
+
+
+примеры кракеров:
+
+/* WM_CREATE window message handle function.
+ * ARGUMENTS:
+ *   - structure with creation data:
+ *       CREATESTRUCT *CS;
+ * RETURNS:
+ *   (BOOL) TRUE to continue creation window, FALSE to terminate.
+ */
+BOOL win::OnCreate( CREATESTRUCT *CS )
+{
+  return TRUE;
+} /* End of 'win::OnCreate' function */
+
+/* WM_DESTROY window message handle function.
+ * ARGUMENTS: None.
+ * RETURNS: None.
+ */
+VOID win::OnDestroy( VOID )
+{
+} /* End of 'win::OnDestroy' function */
+
+/* WM_SIZE window message handle function.
+ * ARGUMENTS:
+ *   - sizing flag (see SIZE_***, like SIZE_MAXIMIZED)
+ *       UINT State;
+ *   - new width and height of client area:
+ *       INT W, H;
+ * RETURNS: None.
+ */
+VOID win::OnSize( UINT State, INT W, INT H )
+{
+} /* End of 'win::OnSize' function */
+
+/* WM_ERASEBKGND window message handle function.
+ * ARGUMENTS:
+ *   - device context of client area:
+ *       HDC hDC;
+ * RETURNS:
+ *   (BOOL) TRUE if background is erased, FALSE otherwise.
+ */
+BOOL win::OnEraseBkgnd( HDC hDC )
+{
+  return TRUE;
+} /* End of 'win::OnEraseBkgnd' function */
+
+/* WM_PAINT window message handle function.
+ * ARGUMENTS:
+ *   - window device context:
+ *       HDC hDC;
+ *   - paint message structure pointer:
+ *       PAINTSTRUCT *PS;
+ * RETURNS: None.
+ */
+VOID win::OnPaint( HDC hDC, PAINTSTRUCT *PS )
+{
+} /* End of 'win::OnPaint' function */ 
+
+/* WM_ACTIVATE window message handle function.
+ * ARGUMENTS:
+ *   - reason (WA_CLICKACTIVE, WA_ACTIVE or WA_INACTIVE):
+ *       UINT Reason;
+ *   - handle of active window:
+ *       HWND hWndActDeact;
+ *   - minimized flag:
+ *       BOOL IsMinimized;
+ * RETURNS: None.
+ */
+VOID win::OnActivate( UINT Reason, HWND hWndActDeact, BOOL IsMinimized )
+{
+  // IsActive = Reason == WA_CLICKACTIVE || Reason == WA_ACTIVE;
+} /* End of 'win::OnActivate' function */
+
+/* WM_TIMER window message handle function.
+ * ARGUMENTS:
+ *   - specified the timer identifier.
+ *       INT Id;
+ * RETURNS: None.
+ */
+VOID win::OnTimer( INT Id ) 
+{
+} /* End of 'win::OnTimer' function */
+
+/* WM_MOUSEWHEEL window message handle function.
+ * ARGUMENTS:
+ *   - mouse window position:
+ *       INT X, Y;
+ *   - mouse wheel relative delta value:
+ *       INT Z;
+ *   - mouse keys bits (see MK_*** bits constants):
+ *       UINT Keys;
+ * RETURNS: None.
+ */
+VOID win::OnMouseWheel( INT X, INT Y, INT Z, UINT Keys )
+{
+  MouseWheel += Z;
+} /* End of 'win::OnMouseWheel' function */
+
+
+/* WM_NOTIFY window message handle function.
+ * ARGUMENTS:
+ *   - control identifier:
+ *       INT Id;
+ *   - notification header depended to control type:
+ *       NMHDR *NoteHead;
+ * RETURNS:
+ *   (LRESULT) return value depended to notification.
+ */
+LRESULT win::OnNotify( INT Id, NMHDR* NoteHead )
+{
+  return 0;
+} /* End of 'win::OnNotify' function */
+
+
+/* WM_COMMAND window message handle function.
+ * ARGUMENTS:
+ *   - item (menu or accelerator) or control window identifier:
+ *       INT Id;
+ *   - control window handle:
+ *       HWND hWndCtl;
+ *   - notification: 0 - menu, 1 - accelerator, otherwise -
+ *     depended to control (like BM_CLICKED):
+ *       UINT CodeNotify;
+ * RETURNS: None.
+ */
+VOID win::OnCommand( INT Id, HWND hWndCtl, UINT CodeNotify )
+{
+} /* End of 'win::OnCommand' function */
+
+
+
+/* WM_DROPFILES window message handle function.
+ * ARGUMENTS:
+ *   - handle to an internal structure describing the dropped files:
+ *       HDROP hDrop;
+ * RETURNS: None.
+ */
+VOID win::OnDropFiles( HDROP hDrop )
+{
+  static CHAR Buf[_MAX_PATH];
+
+  INT n = DragQueryFile(hDrop, 0xFFFFFFFF, NULL, 0);
+  if (n > 0)
+  {
+    POINT pt;
+    DragQueryPoint(hDrop, &pt);
+    ClientToScreen(hWnd, &pt);
+    HWND hWndItem = WindowFromPoint(pt);
+    if (hWndItem == /* Check window */ )
+    {
+      /* for single file: DragQueryFile(hDrop, 0, Buf, sizeof(Buf)); */
+      // Handle every file
+      for (INT i = 0; i < n; i++)
+      {
+        DragQueryFile(hDrop, i, Buf, sizeof(Buf));
+        /// Handle filename from 'Buf'
+        // Can split:
+        static CHAR
+          Drive[_MAX_DRIVE], Dir[_MAX_DIR],
+          FileName[_MAX_FNAME], FileExt[_MAX_EXT];
+
+        _splitpath(Buf, Drive, Dir, FileName, FileExt);
+        // . . .
+      }
+    }
+  }
+} /* End of 'win::OnDropFiles' function */
+
+
+/* WM_DRAWITEM window message handle function.
+ * ARGUMENTS:
+ *   - control identifier (for menu - 0):
+ *       INT Id;
+ *   - draw item information structure pointer:
+ *       DRAWITEMSTRUCT *DrawItem;
+ * RETURNS: None.
+ *   (LRESULT) return value depended to notification.
+ */
+VOID win::OnDrawItem( INT Id, DRAWITEMSTRUCT* DrawItem )
+{
+  if (DrawItem->CtlID == ...) // sample for check box draw as button
+  {
+    UINT Flags = DFCS_BUTTONPUSH;
+
+    if (DrawItem->itemState & ODS_DISABLED)
+      Flags |= DFCS_INACTIVE;
+    if (DrawItem->itemState & ODS_SELECTED)
+      Flags |= DFCS_PUSHED;
+
+    DrawFrameControl(DrawItem->hDC, &DrawItem->rcItem, DFC_BUTTON, Flags);
+    InflateRect(&DrawItem->rcItem, -2, -2);
+    Flags &= ~DFCS_PUSHED;
+    Flags &= ~DFCS_BUTTONPUSH;
+    Flags |= DFCS_BUTTONCHECK | DFCS_FLAT;
+    if (DrawItem->CtlID == ...)
+      Flags |= DFCS_CHECKED;
+    DrawFrameControl(DrawItem->hDC, &DrawItem->rcItem, DFC_BUTTON, Flags);
+  }
+} /* End of 'win::OnDrawItem' function */
+
+/* WM_HSCROLL message handle function.
+ * ARGUMENTS:
+ *   - handle of scroll window or nullptr for window scroll bars:
+ *       HWND hWndCtl;
+ *   - scrool bar request code (see SB_***):
+ *       UINT Code;
+ *   - scroll position for 'Code' is SB_THUMBPOSITION or SB_THUMBTRACK:
+ *       INT Pos;
+ * RETURNS: None.
+ */
+VOID win::OnHScroll( HWND hWndCtl, UINT Code, INT Pos )
+{
+} /* End of 'win::OnHScroll' function */
+
+/* WM_VSCROLL message handle function.
+ * ARGUMENTS:
+ *   - handle of scroll window or nullptr for window scroll bars:
+ *       HWND hWndCtl;
+ *   - scrool bar request code (see SB_***):
+ *       UINT Code;
+ *   - scroll position for 'Code' is SB_THUMBPOSITION or SB_THUMBTRACK:
+ *       INT Pos;
+ * RETURNS: None.
+ */
+VOID win::OnVScroll( HWND hWndCtl, UINT Code, INT Pos )
+{
+} /* End of 'win::OnVScroll' function */
+
+/* WM_MENUSELECT window message handle function.
+ * ARGUMENTS:
+ *   - handle of menu:
+ *       HMENU hMenu;
+ *   - submenu item ID or submenu index
+ *       INT Item;
+ *   - handle of popup menu if selected popup submenu:
+ *       HMENU hMenuPopup;
+ *   - menu item flags (see MF_***):
+ *       UINT Flags;
+ * RETURNS: None.
+ */
+VOID win::OnMenuSelect( HMENU hMenu, INT Item, HMENU hMenuPopup, UINT Flags )
+{
+} /* End of 'win::OnMenuSelect' function */
+
+/* WM_INITMENUPOPUP window message handle function.
+ * ARGUMENTS:
+ *   - handle of popup menu:
+ *       HMENU hMenu;
+ *   - submenu item position:
+ *       UINT Item;
+ *   - window system menu flag:
+ *       BOOL IsSystemMenu;
+ * RETURNS: None.
+ */
+VOID win::OnInitMenuPopup( HMENU hMenu, UINT Item, BOOL IsSystemMenu )
+{
+} /* End of 'win::OnInitMenuPopup' function */
+
+
+/* WM_EXITSIZEMOVE window message handle function.
+ * ARGUMENTS: None.
+ * RETURNS: None.
+ */
+VOID win::OnExitSizeMove( VOID )
+{
+} /* End of 'win::OnExitSizeMove' function */
+
+/* WM_ENTERSIZEMOVE window message handle function.
+ * ARGUMENTS: None.
+ * RETURNS: None.
+ */
+VOID win::OnEnterSizeMove( VOID )
+{
+} /* End of 'win::OnEnterSizeMove' function */
+
+
+/* Window message universal handle function.
+ * Should be returned 'DefWindowProc' call result.
+ * ARGUMENTS:
+ *   - message type (see WM_***):
+ *      UINT Msg;
+ *   - message 'word' parameter:
+ *      WPARAM wParam;
+ *   - message 'long' parameter:
+ *      LPARAM lParam;
+ * RETURNS:
+ *   (LRESULT) message depende return value.
+ */
+LRESULT win::OnMessage( UINT Msg, WPARAM wParam, LPARAM lParam )
+{
+  return DefWindowProc(hWnd, Msg, wParam, lParam);
+} /* End of 'win::OnMessage' function */
+
+/* The main program function.
+ * ARGUMENTS:
+ *   - handle of application instance:
+ *       HINSTANCE hInstance;
+ *   - dummy handle of previous application instance (not used):
+ *       HINSTANCE hPrevInstance;
+ *   - command line string:
+ *       CHAR *CmdLine;
+ *   - show window command parameter (see SW_***):
+ *       INT CmdShow;
+ * RETURNS:
+ *   (INT) Error level for operation system (0 for success).
+ */
+INT WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
+                    CHAR *CmdLine, INT ShowCmd )
+{
+  win myw(hInstance); // !!! подумать над отдельным: myw.Create(); !!! полиморфизм
+
+  myw.Run();
+} /* End of 'WinMain' function */
+
+
+Дополнительно
+Сообщения:
+case WM_INITDIALOG:     -- используется в диалоговых окнах
+  return Win->OnInitDialog((HWND)(wParam), lParam);
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+case WM_KEYDOWN:
+  Win->OnKey((UINT)(wParam), TRUE, (int)(short)LOWORD(lParam),
+             (UINT)HIWORD(lParam));
+  return 0;
+case WM_KEYUP:
+  Win->OnKey((UINT)(wParam), FALSE, (int)(short)LOWORD(lParam),
+             (UINT)HIWORD(lParam));
+  return 0;
+
+
+Обработчики:
+
+/* WM_INITDIALOG window message handle function.
+ * ARGUMENTS:
+ *   - control handle to be set focus:
+ *       HWND hWndFocus;
+ *   - additional dialog creation parameter:
+ *       LPARAM lParam;
+ * RETURNS:
+ *   (BOOL) TRUE for use hWndFocus, FALSE for user focus window set.
+ */
+BOOL win::OnInitDialog( HWND hWndFocus, LPARAM lParam )
+{
+  return TRUE;
+} /* End of 'win::OnInitDialog' function */
+
+
+/* WM_KEYDOWN/WM_KEYUP window message handle function.
+ * ARGUMENTS:
+ *   - virtual key number (see VK_***, 'A', ..., '0', ...):
+ *       UINT Key;
+ *   - press flag:
+ *       BOOL IsPress;
+ *   - autorepeat counter:
+ *       INT RepeatCount;
+ *   - shift/control etc key states bits (see MK_***):
+ *       UINT ShiftKeysFlags;
+ * RETURNS: None.
+ */
+VOID win::OnKey( UINT Key, BOOL IsPress,
+                 INT RepeatCount, UINT ShiftKeysFlags )
+{
+} /* End of 'win::OnKey' function */
+
+
+Структура T07RT:
+\src
+  \mth\
+    mth_***.h
+  \win\
+     win.h           class virt::win
+     win.cpp         win::win() Run() Create() WinFunc()
+     win_msg.cpp     On***()
+  \rt\
+    rt_win.h
+    rt_win.cpp
+  \utils\
+    \tests\
+      test_system.h
+      test_vec3_***.cpp
+def.h
+main.cpp
+**rt.h
+**rt.cpp
+
+Проект:
+\Source Files
+  \Math Support
+  \Windows Depended
+    win.cpp
+    . . .
+  \Ray Tracing
+    rt_win.h
+    rt_win.cpp
+  \Utilities
+    \Unit Tests
+
+
+Пример окна для Ray Tracing:
+
+class rt_win : public win, public frame
+{
+  . . .
+};
