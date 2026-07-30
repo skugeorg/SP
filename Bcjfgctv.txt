@@ -1,0 +1,476 @@
+Я не могу прикрепить архив или файлы напрямую, но я могу дать все файлы в виде блоков кода — вы скопируете их и сохраните с указанными именами. Это займёт 2 минуты.
+
+Ниже — полный набор файлов для минимального проекта.
+Структура:
+
+```
+проект/
+├── win.h
+├── win.cpp
+├── win_msg.cpp
+├── mywindow.h
+├── mywindow.cpp
+└── main.cpp
+```
+
+---
+
+📄 1. win.h
+
+```cpp
+#pragma once
+#include <windows.h>
+
+class win
+{
+protected:
+    HWND hWnd;
+    INT W, H;
+    HINSTANCE hInstance;
+private:
+    static LRESULT CALLBACK WinFunc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam);
+    BOOL IsFullScreen;
+    RECT FullScreenSaveRect;
+    INT MouseWheel;
+public:
+    BOOL IsActive;
+
+    win(HINSTANCE hInst = GetModuleHandle(nullptr));
+    virtual ~win();
+    virtual VOID Run();
+    VOID FlipFullScreen();
+
+    virtual BOOL OnCreate(CREATESTRUCT *CS);
+    virtual VOID OnDestroy();
+    virtual BOOL OnEraseBkgnd(HDC hDC);
+    virtual VOID OnPaint(HDC hDC, PAINTSTRUCT *Ps);
+    virtual VOID OnActivate(UINT Reason, HWND hWndActDeact, BOOL IsMinimized);
+    virtual VOID OnMouseWheel(INT X, INT Y, INT Z, UINT Keys);
+    virtual VOID OnLButtonDown(BOOL IsDoubleClick, INT X, INT Y, UINT Keys);
+    virtual VOID OnRButtonDown(BOOL IsDoubleClick, INT X, INT Y, UINT Keys);
+    virtual VOID OnMButtonDown(BOOL IsDoubleClick, INT X, INT Y, UINT Keys);
+    virtual VOID OnLButtonUp(INT X, INT Y, UINT Keys);
+    virtual VOID OnRButtonUp(INT X, INT Y, UINT Keys);
+    virtual VOID OnMButtonUp(INT X, INT Y, UINT Keys);
+    virtual VOID OnMouseMove(INT X, INT Y, UINT Keys);
+    virtual VOID OnSize(UINT State, INT W, INT H);
+    virtual VOID OnTimer(INT Id);
+    virtual VOID OnDropFiles(HDROP hDrop);
+    virtual VOID OnDrawItem(INT Id, DRAWITEMSTRUCT *DrawItem);
+    virtual LRESULT OnNotify(INT Id, NMHDR *NoteHead);
+    virtual VOID OnCommand(INT Id, HWND hWndCtl, UINT CodeNotify);
+    virtual VOID OnMenuSelect(HMENU hMenu, INT Item, HMENU hMenuPopup, UINT Flags);
+    virtual VOID OnInitMenuPopup(HMENU hMenu, UINT Item, BOOL IsSystemMenu);
+    virtual VOID OnHScroll(HWND hWndCtl, UINT Code, INT Pos);
+    virtual VOID OnVScroll(HWND hWndCtl, UINT Code, INT Pos);
+    virtual VOID OnExitSizeMove();
+    virtual VOID OnEnterSizeMove();
+    virtual VOID OnKey(UINT Key, BOOL IsPress, INT RepeatCount, UINT ShiftKeysFlags);
+    virtual BOOL OnInitDialog(HWND hWndFocus, LPARAM lParam);
+    virtual LRESULT OnMessage(UINT Msg, WPARAM wParam, LPARAM lParam);
+    virtual VOID OnGetMinMaxInfo(MINMAXINFO *MinMax);
+};
+```
+
+---
+
+📄 2. win.cpp
+
+```cpp
+#include "win.h"
+
+static const wchar_t WINDOW_CLASS_NAME[] = L"WinClass";
+
+win::win(HINSTANCE hInst) : hInstance(hInst), hWnd(nullptr), W(0), H(0),
+    IsFullScreen(FALSE), MouseWheel(0), IsActive(TRUE)
+{
+    WNDCLASSEX wc = {};
+    wc.cbSize = sizeof(WNDCLASSEX);
+    wc.style = CS_HREDRAW | CS_VREDRAW;
+    wc.lpfnWndProc = WinFunc;
+    wc.cbClsExtra = 0;
+    wc.cbWndExtra = sizeof(win *);
+    wc.hInstance = hInstance;
+    wc.hIcon = LoadIcon(nullptr, IDI_APPLICATION);
+    wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    wc.lpszMenuName = nullptr;
+    wc.lpszClassName = WINDOW_CLASS_NAME;
+    wc.hIconSm = nullptr;
+
+    RegisterClassEx(&wc);
+
+    hWnd = CreateWindowEx(
+        0,
+        WINDOW_CLASS_NAME,
+        L"Default Window Title",
+        WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+        CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
+        nullptr, nullptr, hInstance,
+        reinterpret_cast<VOID *>(this)
+    );
+}
+
+win::~win()
+{
+    if (hWnd)
+        DestroyWindow(hWnd);
+}
+
+VOID win::Run()
+{
+    MSG msg;
+    while (TRUE)
+    {
+        if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
+        {
+            if (msg.message == WM_QUIT)
+                break;
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+        else
+        {
+            // Idle – можно делать фоновую работу
+        }
+    }
+}
+
+VOID win::FlipFullScreen()
+{
+    if (!IsFullScreen)
+    {
+        GetWindowRect(hWnd, &FullScreenSaveRect);
+        SetWindowLong(hWnd, GWL_STYLE, WS_POPUP | WS_VISIBLE);
+        SetWindowPos(hWnd, HWND_TOP, 0, 0,
+            GetSystemMetrics(SM_CXSCREEN),
+            GetSystemMetrics(SM_CYSCREEN),
+            SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+        IsFullScreen = TRUE;
+    }
+    else
+    {
+        SetWindowLong(hWnd, GWL_STYLE, WS_OVERLAPPEDWINDOW | WS_VISIBLE);
+        SetWindowPos(hWnd, HWND_TOP,
+            FullScreenSaveRect.left, FullScreenSaveRect.top,
+            FullScreenSaveRect.right - FullScreenSaveRect.left,
+            FullScreenSaveRect.bottom - FullScreenSaveRect.top,
+            SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+        IsFullScreen = FALSE;
+    }
+}
+
+LRESULT CALLBACK win::WinFunc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam)
+{
+    if (Msg == WM_GETMINMAXINFO)
+    {
+        MINMAXINFO *mmi = (MINMAXINFO *)lParam;
+        mmi->ptMaxTrackSize.y = GetSystemMetrics(SM_CYMAXTRACK) +
+                                GetSystemMetrics(SM_CYCAPTION) +
+                                GetSystemMetrics(SM_CYMENU) +
+                                GetSystemMetrics(SM_CYBORDER) * 2;
+        mmi->ptMinTrackSize.y = GetSystemMetrics(SM_CYCAPTION) * 8 +
+                                GetSystemMetrics(SM_CYMENU) +
+                                GetSystemMetrics(SM_CYBORDER) * 2;
+        mmi->ptMinTrackSize.x += 300;
+        return 0;
+    }
+
+    if (Msg == WM_CREATE)
+    {
+        SetWindowLongPtr(hWnd, 0, (UINT_PTR)((CREATESTRUCT *)lParam)->lpCreateParams);
+    }
+
+    win *Win = reinterpret_cast<win *>(GetWindowLongPtr(hWnd, 0));
+    if (Win == nullptr)
+        return DefWindowProc(hWnd, Msg, wParam, lParam);
+
+    switch (Msg)
+    {
+    case WM_CREATE:
+        Win->hWnd = hWnd;
+        return Win->OnCreate((CREATESTRUCT *)lParam) ? 0 : -1;
+
+    case WM_SIZE:
+        Win->W = (INT)(SHORT)LOWORD(lParam);
+        Win->H = (INT)(SHORT)HIWORD(lParam);
+        Win->OnSize((UINT)wParam, LOWORD(lParam), HIWORD(lParam));
+        return 0;
+
+    case WM_ACTIVATE:
+        Win->IsActive = (LOWORD(wParam) != WA_INACTIVE);
+        Win->OnActivate((UINT)LOWORD(wParam), (HWND)lParam, (BOOL)HIWORD(wParam));
+        return 0;
+
+    case WM_ERASEBKGND:
+        return (LRESULT)Win->OnEraseBkgnd((HDC)wParam);
+
+    case WM_PAINT:
+    {
+        PAINTSTRUCT ps;
+        HDC hDC = BeginPaint(hWnd, &ps);
+        Win->OnPaint(hDC, &ps);
+        EndPaint(hWnd, &ps);
+        return 0;
+    }
+
+    case WM_DRAWITEM:
+        Win->OnDrawItem((INT)wParam, (DRAWITEMSTRUCT *)lParam);
+        return 0;
+
+    case WM_TIMER:
+        Win->OnTimer((INT)wParam);
+        return 0;
+
+    case WM_MOUSEWHEEL:
+        Win->OnMouseWheel((INT)(SHORT)LOWORD(lParam),
+                          (INT)(SHORT)HIWORD(lParam),
+                          (INT)(SHORT)HIWORD(wParam),
+                          (UINT)(SHORT)LOWORD(wParam));
+        return 0;
+
+    case WM_LBUTTONDBLCLK:
+        Win->OnLButtonDown(TRUE, (INT)(SHORT)LOWORD(lParam),
+                           (INT)(SHORT)HIWORD(lParam),
+                           (UINT)(SHORT)LOWORD(wParam));
+        return 0;
+
+    case WM_LBUTTONDOWN:
+        Win->OnLButtonDown(FALSE, (INT)(SHORT)LOWORD(lParam),
+                           (INT)(SHORT)HIWORD(lParam),
+                           (UINT)(SHORT)LOWORD(wParam));
+        return 0;
+
+    case WM_RBUTTONDOWN:
+        Win->OnRButtonDown(FALSE, (INT)(SHORT)LOWORD(lParam),
+                           (INT)(SHORT)HIWORD(lParam),
+                           (UINT)(SHORT)LOWORD(wParam));
+        return 0;
+
+    case WM_MBUTTONDOWN:
+        Win->OnMButtonDown(FALSE, (INT)(SHORT)LOWORD(lParam),
+                           (INT)(SHORT)HIWORD(lParam),
+                           (UINT)(SHORT)LOWORD(wParam));
+        return 0;
+
+    case WM_LBUTTONUP:
+        Win->OnLButtonUp((INT)(SHORT)LOWORD(lParam),
+                         (INT)(SHORT)HIWORD(lParam),
+                         (UINT)(SHORT)LOWORD(wParam));
+        return 0;
+
+    case WM_RBUTTONUP:
+        Win->OnRButtonUp((INT)(SHORT)LOWORD(lParam),
+                         (INT)(SHORT)HIWORD(lParam),
+                         (UINT)(SHORT)LOWORD(wParam));
+        return 0;
+
+    case WM_MBUTTONUP:
+        Win->OnMButtonUp((INT)(SHORT)LOWORD(lParam),
+                         (INT)(SHORT)HIWORD(lParam),
+                         (UINT)(SHORT)LOWORD(wParam));
+        return 0;
+
+    case WM_MOUSEMOVE:
+        Win->OnMouseMove((INT)(SHORT)LOWORD(lParam),
+                         (INT)(SHORT)HIWORD(lParam),
+                         (UINT)(SHORT)LOWORD(wParam));
+        return 0;
+
+    case WM_DROPFILES:
+        Win->OnDropFiles((HDROP)wParam);
+        return 0;
+
+    case WM_NOTIFY:
+        return Win->OnNotify((INT)wParam, (NMHDR *)lParam);
+
+    case WM_COMMAND:
+        Win->OnCommand((INT)LOWORD(wParam), (HWND)lParam, (UINT)HIWORD(wParam));
+        return 0;
+
+    case WM_MENUSELECT:
+        Win->OnMenuSelect((HMENU)lParam,
+                          (HIWORD(wParam) & MF_POPUP) ? 0L : (INT)LOWORD(wParam),
+                          (HIWORD(wParam) & MF_POPUP) ? GetSubMenu((HMENU)lParam, LOWORD(wParam)) : nullptr,
+                          (UINT)(((SHORT)HIWORD(wParam) == -1) ? 0xFFFFFFFF : HIWORD(wParam)));
+        return 0;
+
+    case WM_INITMENUPOPUP:
+        Win->OnInitMenuPopup((HMENU)wParam, (UINT)LOWORD(lParam), (BOOL)HIWORD(lParam));
+        return 0;
+
+    case WM_HSCROLL:
+        Win->OnHScroll((HWND)lParam, LOWORD(wParam), HIWORD(wParam));
+        return 0;
+
+    case WM_VSCROLL:
+        Win->OnVScroll((HWND)lParam, LOWORD(wParam), HIWORD(wParam));
+        return 0;
+
+    case WM_ENTERSIZEMOVE:
+        Win->OnEnterSizeMove();
+        return 0;
+
+    case WM_EXITSIZEMOVE:
+        Win->OnExitSizeMove();
+        return 0;
+
+    case WM_KEYDOWN:
+        Win->OnKey((UINT)wParam, TRUE, (int)(short)LOWORD(lParam), (UINT)HIWORD(lParam));
+        return 0;
+
+    case WM_KEYUP:
+        Win->OnKey((UINT)wParam, FALSE, (int)(short)LOWORD(lParam), (UINT)HIWORD(lParam));
+        return 0;
+
+    case WM_INITDIALOG:
+        return (LRESULT)Win->OnInitDialog((HWND)wParam, lParam);
+
+    case WM_DESTROY:
+        Win->OnDestroy();
+        PostQuitMessage(0);
+        return 0;
+
+    default:
+        return Win->OnMessage(Msg, wParam, lParam);
+    }
+}
+```
+
+---
+
+📄 3. win_msg.cpp
+
+```cpp
+#include "win.h"
+
+BOOL win::OnCreate(CREATESTRUCT *CS) { return TRUE; }
+VOID win::OnDestroy() {}
+BOOL win::OnEraseBkgnd(HDC hDC) { return TRUE; }
+VOID win::OnPaint(HDC hDC, PAINTSTRUCT *Ps) {}
+VOID win::OnActivate(UINT Reason, HWND hWndActDeact, BOOL IsMinimized) {}
+VOID win::OnMouseWheel(INT X, INT Y, INT Z, UINT Keys) { MouseWheel += Z; }
+VOID win::OnLButtonDown(BOOL IsDoubleClick, INT X, INT Y, UINT Keys) {}
+VOID win::OnRButtonDown(BOOL IsDoubleClick, INT X, INT Y, UINT Keys) {}
+VOID win::OnMButtonDown(BOOL IsDoubleClick, INT X, INT Y, UINT Keys) {}
+VOID win::OnLButtonUp(INT X, INT Y, UINT Keys) {}
+VOID win::OnRButtonUp(INT X, INT Y, UINT Keys) {}
+VOID win::OnMButtonUp(INT X, INT Y, UINT Keys) {}
+VOID win::OnMouseMove(INT X, INT Y, UINT Keys) {}
+VOID win::OnSize(UINT State, INT W, INT H) {}
+VOID win::OnTimer(INT Id) {}
+VOID win::OnDropFiles(HDROP hDrop) {}
+VOID win::OnDrawItem(INT Id, DRAWITEMSTRUCT *DrawItem) {}
+LRESULT win::OnNotify(INT Id, NMHDR *NoteHead) { return 0; }
+VOID win::OnCommand(INT Id, HWND hWndCtl, UINT CodeNotify) {}
+VOID win::OnMenuSelect(HMENU hMenu, INT Item, HMENU hMenuPopup, UINT Flags) {}
+VOID win::OnInitMenuPopup(HMENU hMenu, UINT Item, BOOL IsSystemMenu) {}
+VOID win::OnHScroll(HWND hWndCtl, UINT Code, INT Pos) {}
+VOID win::OnVScroll(HWND hWndCtl, UINT Code, INT Pos) {}
+VOID win::OnEnterSizeMove() {}
+VOID win::OnExitSizeMove() {}
+VOID win::OnKey(UINT Key, BOOL IsPress, INT RepeatCount, UINT ShiftKeysFlags) {}
+BOOL win::OnInitDialog(HWND hWndFocus, LPARAM lParam) { return TRUE; }
+LRESULT win::OnMessage(UINT Msg, WPARAM wParam, LPARAM lParam)
+{
+    return DefWindowProc(hWnd, Msg, wParam, lParam);
+}
+VOID win::OnGetMinMaxInfo(MINMAXINFO *MinMax) {}
+```
+
+---
+
+📄 4. mywindow.h
+
+```cpp
+#pragma once
+#include "win.h"
+
+class MyWindow : public win
+{
+public:
+    MyWindow(HINSTANCE hInst);
+    virtual ~MyWindow();
+
+protected:
+    virtual BOOL OnCreate(CREATESTRUCT *CS) override;
+    virtual VOID OnDestroy() override;
+    virtual VOID OnPaint(HDC hDC, PAINTSTRUCT *Ps) override;
+    virtual VOID OnSize(UINT State, INT W, INT H) override;
+};
+```
+
+---
+
+📄 5. mywindow.cpp
+
+```cpp
+#include "mywindow.h"
+
+MyWindow::MyWindow(HINSTANCE hInst) : win(hInst)
+{
+}
+
+MyWindow::~MyWindow()
+{
+}
+
+BOOL MyWindow::OnCreate(CREATESTRUCT *CS)
+{
+    SetWindowText(hWnd, L"Простое окно");
+    return TRUE;
+}
+
+VOID MyWindow::OnDestroy()
+{
+}
+
+VOID MyWindow::OnPaint(HDC hDC, PAINTSTRUCT *Ps)
+{
+    RECT rect;
+    GetClientRect(hWnd, &rect);
+
+    HBRUSH hBrush = CreateSolidBrush(RGB(255, 255, 255));
+    FillRect(hDC, &rect, hBrush);
+    DeleteObject(hBrush);
+
+    const wchar_t *text = L"Привет, мир!";
+    SetBkMode(hDC, TRANSPARENT);
+    SetTextColor(hDC, RGB(0, 0, 255));
+    DrawText(hDC, text, -1, &rect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+}
+
+VOID MyWindow::OnSize(UINT State, INT W, INT H)
+{
+    win::OnSize(State, W, H);
+}
+```
+
+---
+
+📄 6. main.cpp
+
+```cpp
+#include "mywindow.h"
+
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
+{
+    MyWindow wnd(hInstance);
+    wnd.Run();
+    return 0;
+}
+```
+
+---
+
+Как собрать
+
+1. Создайте пустую папку, например MyWinApp.
+2. Скопируйте каждый блок выше в отдельный файл с указанным именем.
+3. Откройте Visual Studio (или другой компилятор) и создайте проект Windows Desktop Application (или пустой проект Win32).
+4. Добавьте все эти файлы в проект (или просто поместите в папку с проектом и добавьте вручную).
+5. Убедитесь, что используется Unicode (в свойствах проекта → C/C++ → Language → Character Set = Use Unicode Character Set).
+6. Скомпилируйте и запустите.
+
+В результате откроется окно с белым фоном и синим текстом «Привет, мир!» по центру.
+Теперь вы можете расширять этот код для трассировки лучей или любых других задач.
